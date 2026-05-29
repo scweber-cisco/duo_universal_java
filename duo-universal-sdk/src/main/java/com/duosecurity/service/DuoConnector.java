@@ -45,7 +45,7 @@ public class DuoConnector {
    * @throws DuoException For issues getting and validating the URL
    */
   public DuoConnector(String apiHost, String[] caCerts) throws DuoException {
-    this(apiHost, null, null, caCerts);
+    this(apiHost, null, null, caCerts, true);
   }
 
   /**
@@ -60,29 +60,46 @@ public class DuoConnector {
    */
   public DuoConnector(String apiHost, String proxyHost, Integer proxyPort, String[] caCerts)
           throws DuoException {
+    this(apiHost, proxyHost, proxyPort, caCerts, true);
+  }
+
+  /**
+   * DuoConnector Constructor.
+   *
+   * @param apiHost This value is the api host provided by Duo in the admin panel.
+   * @param proxyHost This value is the proxy server hostname
+   * @param proxyPort This value is the proxy server port
+   * @param caCerts CA Certificates used to connect to Duo
+   * @param usePersistentConnections Whether to reuse HTTP connections across requests
+   *
+   * @throws DuoException For issues getting and validating the URL
+   */
+  public DuoConnector(String apiHost, String proxyHost, Integer proxyPort, String[] caCerts,
+                      boolean usePersistentConnections)
+          throws DuoException {
     CertificatePinner duoCertificatePinner = new CertificatePinner.Builder()
             .add(apiHost, caCerts).build();
     ConnectionPool connectionPool = new ConnectionPool(
             MAX_IDLE_CONNECTIONS, CONNECTION_KEEP_ALIVE_SECONDS, TimeUnit.SECONDS);
-    OkHttpClient client;
+    OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder()
+            .certificatePinner(duoCertificatePinner)
+            .connectionPool(connectionPool);
+    if (!usePersistentConnections) {
+      // https://github.com/square/okhttp/issues/2031#issuecomment-159458064
+      clientBuilder.addInterceptor(chain ->
+              chain.proceed(chain.request().newBuilder()
+                      .header("Connection", "close")
+                      .build()));
+    }
     if (proxyHost != null && proxyPort != null) {
       Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort));
-      client = new OkHttpClient.Builder()
-              .certificatePinner(duoCertificatePinner)
-              .connectionPool(connectionPool)
-              .proxy(proxy)
-              .build();
-    } else {
-      client = new OkHttpClient.Builder()
-              .certificatePinner(duoCertificatePinner)
-              .connectionPool(connectionPool)
-              .build();
+      clientBuilder.proxy(proxy);
     }
 
     retrofit = new Retrofit.Builder()
             .baseUrl(getAndValidateUrl(apiHost, "").toString())
             .addConverterFactory(JacksonConverterFactory.create())
-            .client(client)
+            .client(clientBuilder.build())
             .build();
   }
 

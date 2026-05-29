@@ -162,6 +162,7 @@ public class Client {
     private Boolean useDuoCodeAttribute;
     private String[] caCerts;
     private String userAgent;
+    private boolean usePersistentConnections;
 
     private static final String[] DEFAULT_CA_CERTS = {
         //Source URL: https://www.amazontrust.com/repository/AmazonRootCA1.cer
@@ -321,6 +322,7 @@ public class Client {
       this.redirectUri = redirectUri;
       this.caCerts = DEFAULT_CA_CERTS;
       this.useDuoCodeAttribute = true;
+      this.usePersistentConnections = true;
       this.userAgent = computeUserAgent();
     }
 
@@ -348,6 +350,7 @@ public class Client {
       this.redirectUri = redirectUri;
       this.caCerts = DEFAULT_CA_CERTS;
       this.useDuoCodeAttribute = true;
+      this.usePersistentConnections = true;
       this.userAgent = computeUserAgent();
     }
 
@@ -368,7 +371,8 @@ public class Client {
       client.redirectUri = redirectUri;
       client.useDuoCodeAttribute = useDuoCodeAttribute;
       client.userAgent = userAgent;
-      client.duoConnector = new DuoConnector(apiHost, proxyHost, proxyPort, caCerts);
+      client.duoConnector = new DuoConnector(apiHost, proxyHost, proxyPort, caCerts,
+              usePersistentConnections);
 
       return client;
     }
@@ -401,10 +405,24 @@ public class Client {
     }
 
     /**
+     * Optionally disable persistent HTTP connections. When disabled, each request will include
+     * a "Connection: close" header, preventing connection reuse.
+     * Defaults true (connections are reused).
+     *
+     * @param usePersistentConnections true to reuse connections, false to close after each request
+     *
+     * @return the Builder
+     */
+    public Builder setUsePersistentConnections(boolean usePersistentConnections) {
+      this.usePersistentConnections = usePersistentConnections;
+      return this;
+    }
+
+    /**
      * Optionally appends string to userAgent.
      *
      * @param newUserAgent Additional info that will be added to the end of the user agent string
-     * 
+     *
      * @return the Builder
      */
     public Builder appendUserAgentInfo(String newUserAgent) {
